@@ -2,8 +2,8 @@
 
 一个原生 macOS 小工具，用来快速切换和编辑本机 Codex 的这两个文件：
 
-- `/Users/gaojie/.codex/config.toml`
-- `/Users/gaojie/.codex/auth.json`
+- `~/.codex/config.toml`
+- `~/.codex/auth.json`
 
 ## 这版已经支持
 
@@ -18,21 +18,21 @@
 ## 本地运行
 
 ```bash
-cd /Volumes/T1/sub/codex-config-switcher
+cd <repo-path>
 swift run CodexConfigSwitcher
 ```
 
 ## 构建 `.app`
 
 ```bash
-cd /Volumes/T1/sub/codex-config-switcher
+cd <repo-path>
 ./scripts/build-icon-assets.sh
 ./scripts/build-app.sh
 ```
 
 构建完成后，生成物在：
 
-`/Volumes/T1/sub/codex-config-switcher/dist/Codex Config Switcher.app`
+`./dist/Codex Config Switcher.app`
 
 ## 预设保存位置
 
@@ -42,7 +42,7 @@ cd /Volumes/T1/sub/codex-config-switcher
 
 ## 图标资产
 
-- 主图标 SVG：`/Volumes/T1/sub/codex-config-switcher/Design/bridge-switch-app-icon.svg`
-- 菜单栏单色 SVG：`/Volumes/T1/sub/codex-config-switcher/Design/bridge-switch-menubar.svg`
-- 主图标透明 PNG：`/Volumes/T1/sub/codex-config-switcher/Design/bridge-switch-app-icon.png`
-- macOS 图标文件：`/Volumes/T1/sub/codex-config-switcher/Support/AppIcon.icns`
+- 主图标 SVG：`./Design/bridge-switch-app-icon.svg`
+- 菜单栏单色 SVG：`./Design/bridge-switch-menubar.svg`
+- 主图标透明 PNG：`./Design/bridge-switch-app-icon.png`
+- macOS 图标文件：`./Support/AppIcon.icns`

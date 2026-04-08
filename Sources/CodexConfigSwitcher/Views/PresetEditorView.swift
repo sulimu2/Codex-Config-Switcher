@@ -122,7 +122,7 @@ struct PresetEditorView: View {
 
                 GridRow {
                     Text("base_url")
-                    TextField("https://xiaojie6.top", text: $model.draft.baseURL)
+                    TextField("https://api.openai.com/v1", text: $model.draft.baseURL)
                         .textFieldStyle(.roundedBorder)
                     Text("wire_api")
                     TextField("responses", text: $model.draft.wireAPI)

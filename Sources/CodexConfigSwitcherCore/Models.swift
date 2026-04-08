@@ -4,14 +4,17 @@ public struct AppPaths: Codable, Equatable, Sendable {
     public var configPath: String
     public var authPath: String
 
+    private static let defaultCodexDirectory = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".codex", isDirectory: true)
+
     public init(configPath: String, authPath: String) {
         self.configPath = configPath
         self.authPath = authPath
     }
 
     public static let `default` = AppPaths(
-        configPath: "/Users/gaojie/.codex/config.toml",
-        authPath: "/Users/gaojie/.codex/auth.json"
+        configPath: defaultCodexDirectory.appendingPathComponent("config.toml").path,
+        authPath: defaultCodexDirectory.appendingPathComponent("auth.json").path
     )
 }
 
@@ -71,7 +74,7 @@ public struct CodexPreset: Identifiable, Codable, Equatable, Sendable {
         streamMaxRetries: Int? = nil,
         streamIdleTimeoutMs: Int? = nil,
         providerName: String = "OpenAI",
-        baseURL: String = "https://xiaojie6.top",
+        baseURL: String = "https://api.openai.com/v1",
         wireAPI: String = "responses",
         requiresOpenAIAuth: Bool = true,
         authMode: String = "apikey",

@@ -39,7 +39,7 @@ struct CodexFileServiceTests {
             """
             {
               "auth_mode": "apikey",
-              "OPENAI_API_KEY": "sk-test-old"
+              "OPENAI_API_KEY": "test-api-key-old"
             }
             """
         )
@@ -51,7 +51,7 @@ struct CodexFileServiceTests {
         #expect(snapshot.preset.streamMaxRetries == 20)
         #expect(snapshot.preset.streamIdleTimeoutMs == 600000)
         #expect(snapshot.preset.authMode == "apikey")
-        #expect(snapshot.preset.apiKey == "sk-test-old")
+        #expect(snapshot.preset.apiKey == "test-api-key-old")
     }
 
     @Test
@@ -90,7 +90,7 @@ struct CodexFileServiceTests {
             """
             {
               "auth_mode": "apikey",
-              "OPENAI_API_KEY": "sk-test-old",
+              "OPENAI_API_KEY": "test-api-key-old",
               "other": "keep-me"
             }
             """
@@ -100,19 +100,19 @@ struct CodexFileServiceTests {
             name: "切换后",
             model: "gpt-5.4",
             reviewModel: "gpt-5.4",
-            baseURL: "https://xiaojie6.top",
-            apiKey: "sk-test-new"
+            baseURL: "https://api.openai.com/v1",
+            apiKey: "test-api-key-new"
         )
 
         let result = try service.apply(preset: preset, paths: workspace.paths)
         let updatedConfig = try workspace.readConfig()
         let updatedAuth = try workspace.readAuthJSONObject()
 
-        #expect(updatedConfig.contains("base_url = \"https://xiaojie6.top\""))
+        #expect(updatedConfig.contains("base_url = \"https://api.openai.com/v1\""))
         #expect(updatedConfig.contains("request_max_retries = 20"))
         #expect(updatedConfig.contains("[[skills.config]]"))
         #expect(updatedAuth["auth_mode"] as? String == "apikey")
-        #expect(updatedAuth["OPENAI_API_KEY"] as? String == "sk-test-new")
+        #expect(updatedAuth["OPENAI_API_KEY"] as? String == "test-api-key-new")
         #expect(updatedAuth["other"] as? String == "keep-me")
         #expect(result.configBackupPath != nil)
         #expect(result.authBackupPath != nil)
@@ -128,15 +128,15 @@ struct CodexFileServiceTests {
 
         let preset = CodexPreset(
             name: "新配置",
-            baseURL: "https://xiaojie6.top",
-            apiKey: "sk-test-new"
+            baseURL: "https://api.openai.com/v1",
+            apiKey: "test-api-key-new"
         )
 
         _ = try service.apply(preset: preset, paths: workspace.paths)
         let updatedConfig = try workspace.readConfig()
 
         #expect(updatedConfig.contains("[model_providers.OpenAI]"))
-        #expect(updatedConfig.contains("base_url = \"https://xiaojie6.top\""))
+        #expect(updatedConfig.contains("base_url = \"https://api.openai.com/v1\""))
     }
 
     @Test
@@ -146,14 +146,23 @@ struct CodexFileServiceTests {
 
         try store.savePresets([
             CodexPreset(name: "本地"),
-            CodexPreset(name: "线上", baseURL: "https://xiaojie6.top", apiKey: "sk-demo"),
+            CodexPreset(name: "线上", baseURL: "https://api.openai.com/v1", apiKey: "demo-api-key"),
         ])
 
         let presets = try store.loadPresets()
 
         #expect(presets.count == 2)
         #expect(presets[0].name == "本地")
-        #expect(presets[1].baseURL == "https://xiaojie6.top")
+        #expect(presets[1].baseURL == "https://api.openai.com/v1")
+    }
+
+    @Test
+    func defaultPathsUseCurrentHomeDirectory() {
+        let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".codex", isDirectory: true)
+
+        #expect(AppPaths.default.configPath == homeDirectory.appendingPathComponent("config.toml").path)
+        #expect(AppPaths.default.authPath == homeDirectory.appendingPathComponent("auth.json").path)
     }
 
     @Test
