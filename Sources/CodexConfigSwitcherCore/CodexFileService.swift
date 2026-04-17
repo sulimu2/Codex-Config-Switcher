@@ -34,6 +34,7 @@ public struct CodexFileService {
 
         let preset = CodexPreset(
             name: "当前配置",
+            environmentTag: PresetEnvironmentTag.infer(from: parsedConfig.openAI["base_url"] ?? ""),
             modelProvider: parsedConfig.topLevel["model_provider"] ?? "OpenAI",
             model: parsedConfig.topLevel["model"] ?? "gpt-5.4",
             reviewModel: parsedConfig.topLevel["review_model"] ?? "gpt-5.4",
@@ -83,6 +84,70 @@ public struct CodexFileService {
         )
     }
 
+    public func latestBackupSummary() throws -> BackupSnapshotSummary? {
+        try listBackupSummaries(limit: 1).first
+    }
+
+    public func restoreLatestBackup(paths: AppPaths) throws -> RestoreResult {
+        guard let latestBackup = try latestBackupSummary() else {
+            throw ConfigSwitchError.fileMissing("没有找到可恢复的备份。")
+        }
+
+        return try restoreBackup(latestBackup, paths: paths)
+    }
+
+    public func listBackupSummaries(limit: Int? = nil) throws -> [BackupSnapshotSummary] {
+        let summaries = try backupDirectories()
+            .compactMap { try backupSummary(for: $0) }
+            .sorted(by: { $0.createdAt > $1.createdAt })
+
+        if let limit {
+            return Array(summaries.prefix(limit))
+        }
+
+        return summaries
+    }
+
+    public func restoreBackup(_ backup: BackupSnapshotSummary, paths: AppPaths) throws -> RestoreResult {
+        let configURL = expandedURL(for: paths.configPath)
+        let authURL = expandedURL(for: paths.authPath)
+
+        try ensureParentDirectory(for: configURL)
+        try ensureParentDirectory(for: authURL)
+
+        let rollbackDirectory = try createBackupDirectory()
+        let rollbackConfigBackupPath = try backupIfNeeded(
+            sourceURL: configURL,
+            destinationURL: rollbackDirectory.appendingPathComponent("config.toml")
+        )
+        let rollbackAuthBackupPath = try backupIfNeeded(
+            sourceURL: authURL,
+            destinationURL: rollbackDirectory.appendingPathComponent("auth.json")
+        )
+
+        if let configBackupPath = backup.configBackupPath {
+            let sourceURL = URL(fileURLWithPath: configBackupPath)
+            if fileManager.fileExists(atPath: configURL.path) {
+                try fileManager.removeItem(at: configURL)
+            }
+            try fileManager.copyItem(at: sourceURL, to: configURL)
+        }
+
+        if let authBackupPath = backup.authBackupPath {
+            let sourceURL = URL(fileURLWithPath: authBackupPath)
+            if fileManager.fileExists(atPath: authURL.path) {
+                try fileManager.removeItem(at: authURL)
+            }
+            try fileManager.copyItem(at: sourceURL, to: authURL)
+        }
+
+        return RestoreResult(
+            sourceBackupDirectoryPath: backup.directoryPath,
+            rollbackConfigBackupPath: rollbackConfigBackupPath,
+            rollbackAuthBackupPath: rollbackAuthBackupPath
+        )
+    }
+
     public func expandedPath(_ path: String) -> String {
         expandedURL(for: path).path
     }
@@ -98,7 +163,15 @@ public struct CodexFileService {
 
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmmss"
-        let directory = backupsRoot.appendingPathComponent(formatter.string(from: .now), isDirectory: true)
+        let timestamp = formatter.string(from: .now)
+        var directory = backupsRoot.appendingPathComponent(timestamp, isDirectory: true)
+        var suffix = 1
+
+        while fileManager.fileExists(atPath: directory.path) {
+            directory = backupsRoot.appendingPathComponent("\(timestamp)-\(suffix)", isDirectory: true)
+            suffix += 1
+        }
+
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }
@@ -114,6 +187,51 @@ public struct CodexFileService {
 
         try fileManager.copyItem(at: sourceURL, to: destinationURL)
         return destinationURL.path
+    }
+
+    private func backupDirectories() throws -> [URL] {
+        let backupsRoot = appSupportDirectory.appendingPathComponent("Backups", isDirectory: true)
+        guard fileManager.fileExists(atPath: backupsRoot.path) else {
+            return []
+        }
+
+        return try fileManager.contentsOfDirectory(
+            at: backupsRoot,
+            includingPropertiesForKeys: [.isDirectoryKey, .creationDateKey],
+            options: [.skipsHiddenFiles]
+        ).filter { url in
+            (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+        }
+    }
+
+    private func backupSummary(for directory: URL) throws -> BackupSnapshotSummary? {
+        let configBackupURL = directory.appendingPathComponent("config.toml")
+        let authBackupURL = directory.appendingPathComponent("auth.json")
+        let configExists = fileManager.fileExists(atPath: configBackupURL.path)
+        let authExists = fileManager.fileExists(atPath: authBackupURL.path)
+
+        guard configExists || authExists else {
+            return nil
+        }
+
+        let resourceValues = try directory.resourceValues(forKeys: [.creationDateKey])
+        let createdAt = resourceValues.creationDate
+            ?? parsedBackupDate(from: directory.lastPathComponent)
+            ?? .distantPast
+
+        return BackupSnapshotSummary(
+            directoryPath: directory.path,
+            createdAt: createdAt,
+            configBackupPath: configExists ? configBackupURL.path : nil,
+            authBackupPath: authExists ? authBackupURL.path : nil
+        )
+    }
+
+    private func parsedBackupDate(from directoryName: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let candidate = String(directoryName.prefix(15))
+        return formatter.date(from: candidate)
     }
 
     private func expandedURL(for path: String) -> URL {

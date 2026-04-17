@@ -1,0 +1,17 @@
+<Application
+    x:Class="CodexConfigSwitcher.WinUI.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <Color x:Key="BrandSlate">#1F2937</Color>
+            <Color x:Key="BrandMint">#D7F1E8</Color>
+            <Color x:Key="BrandMintStrong">#2B8A6E</Color>
+            <Color x:Key="BrandSand">#F4F0E6</Color>
+            <SolidColorBrush x:Key="BrandSlateBrush" Color="{StaticResource BrandSlate}" />
+            <SolidColorBrush x:Key="BrandMintBrush" Color="{StaticResource BrandMint}" />
+            <SolidColorBrush x:Key="BrandMintStrongBrush" Color="{StaticResource BrandMintStrong}" />
+            <SolidColorBrush x:Key="BrandSandBrush" Color="{StaticResource BrandSand}" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

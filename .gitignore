@@ -3,3 +3,6 @@
 .build/
 .swiftpm/
 dist/
+findings.md
+progress.md
+task_plan.md
