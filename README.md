@@ -88,6 +88,22 @@ cd <repo-path>
 
 `./dist/Codex Config Switcher.app`
 
+## 构建 `.dmg`
+
+```bash
+cd <repo-path>
+./scripts/build-dmg.sh
+```
+
+构建完成后，生成物在：
+
+`./dist/Codex-Config-Switcher-<version>.dmg`
+
+说明：
+
+- `dmg` 内会包含 `Codex Config Switcher.app` 和指向 `/Applications` 的快捷方式，便于拖拽安装。
+- 当前产物为本地构建安装包，未做 Apple notarization；首次打开时如果系统提示安全限制，需要在系统设置中手动放行。
+
 ## Windows 当前进度
 
 截至 `2026-04-10`：
