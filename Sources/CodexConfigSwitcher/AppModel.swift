@@ -28,6 +28,58 @@ struct MainWindowContextBannerContext: Equatable {
     let message: String
 }
 
+struct PortalLoginContext: Identifiable, Equatable {
+    let id = UUID()
+    let presetID: UUID
+    let presetName: String
+    let portalURL: String
+}
+
+enum OnboardingStep: Int, CaseIterable, Identifiable {
+    case welcome
+    case files
+    case importLive
+    case targetApp
+    case portalAccount
+    case finish
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .welcome:
+            "欢迎"
+        case .files:
+            "目标文件"
+        case .importLive:
+            "导入现状"
+        case .targetApp:
+            "应用联动"
+        case .portalAccount:
+            "站点账户"
+        case .finish:
+            "完成"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .welcome:
+            "先说明这个工具会做什么，不会做什么。"
+        case .files:
+            "确认 config.toml 和 auth.json 路径。"
+        case .importLive:
+            "确认如何生成你的第一个预设。"
+        case .targetApp:
+            "设置切换后联动的目标应用。"
+        case .portalAccount:
+            "可选绑定站点登录，用于看余额和 token 用量。"
+        case .finish:
+            "确认已完成首轮配置。"
+        }
+    }
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     private enum PresetImportMode {
@@ -41,6 +93,7 @@ final class AppModel: ObservableObject {
     }
 
     private let maxOperationHistoryEntries = 20
+    private let currentOnboardingVersion = 1
 
     @Published var presets: [CodexPreset] = []
     @Published var draft: CodexPreset = .sample()
@@ -66,6 +119,13 @@ final class AppModel: ObservableObject {
     @Published var presetPendingSelection: CodexPreset?
     @Published var isShowingSettingsSheet = false
     @Published var presetEditorMode: PresetEditorMode = .basic
+    @Published var presetAccountSessions: [PresetAccountSessionRecord] = []
+    @Published var isRefreshingAccountOverview = false
+    @Published var portalLoginContext: PortalLoginContext?
+    @Published var accountOverviewErrorMessage: String?
+    @Published var hasCompletedOnboarding = true
+    @Published var onboardingVersion = 0
+    @Published var onboardingStep: OnboardingStep = .welcome
     @Published private var storedLastAppliedPresetID: UUID?
     @Published private var storedLastAppliedAt: Date?
     @Published private var recentAppliedPresetName: String?
@@ -76,7 +136,9 @@ final class AppModel: ObservableObject {
     private let presetStore: PresetStore
     private let settingsStore: SettingsStore
     private let templateStore: TemplateStore
+    private let accountSessionRepository: PresetAccountSessionRepository
     private let connectionTestService: ConnectionTestService
+    private let portalAccountService: PortalAccountService
     private let transferService: PresetTransferService
     private let targetAppService: TargetAppService
     private let pickerService: SystemPickerService
@@ -87,11 +149,13 @@ final class AppModel: ObservableObject {
             let presetStore = try PresetStore()
             let settingsStore = try SettingsStore()
             let templateStore = try TemplateStore()
+            let accountSessionRepository = try PresetAccountSessionRepository()
             self.init(
                 fileService: fileService,
                 presetStore: presetStore,
                 settingsStore: settingsStore,
-                templateStore: templateStore
+                templateStore: templateStore,
+                accountSessionRepository: accountSessionRepository
             )
         } catch {
             fatalError("无法初始化存储目录：\(error.localizedDescription)")
@@ -103,7 +167,9 @@ final class AppModel: ObservableObject {
         presetStore: PresetStore,
         settingsStore: SettingsStore,
         templateStore: TemplateStore,
+        accountSessionRepository: PresetAccountSessionRepository = try! PresetAccountSessionRepository(),
         connectionTestService: ConnectionTestService = ConnectionTestService(),
+        portalAccountService: PortalAccountService = PortalAccountService(),
         transferService: PresetTransferService = PresetTransferService(),
         targetAppService: TargetAppService = TargetAppService(),
         pickerService: SystemPickerService = SystemPickerService()
@@ -112,7 +178,9 @@ final class AppModel: ObservableObject {
         self.presetStore = presetStore
         self.settingsStore = settingsStore
         self.templateStore = templateStore
+        self.accountSessionRepository = accountSessionRepository
         self.connectionTestService = connectionTestService
+        self.portalAccountService = portalAccountService
         self.transferService = transferService
         self.targetAppService = targetAppService
         self.pickerService = pickerService
@@ -159,6 +227,94 @@ final class AppModel: ObservableObject {
         }
 
         return presets.first(where: { $0.id == selectedPresetID })
+    }
+
+    var selectedPresetAccountSession: PresetAccountSessionRecord? {
+        guard let selectedPresetID else {
+            return nil
+        }
+
+        return presetAccountSessions.first(where: { $0.presetID == selectedPresetID })
+    }
+
+    var selectedPresetAccountOverview: PortalAccountOverview? {
+        selectedPresetAccountSession?.cachedOverview
+    }
+
+    var selectedPresetAccountPortalURL: String {
+        if let portalURL = selectedPresetAccountSession?.portalURL,
+           portalURL.isEmpty == false {
+            return portalURL
+        }
+
+        return resolvedPortalURL(for: draft)
+    }
+
+    var selectedPresetAccountStatusTitle: String {
+        if isRefreshingAccountOverview {
+            return "刷新中"
+        }
+        if selectedPresetAccountOverview != nil {
+            return "已同步"
+        }
+        if accountOverviewErrorMessage != nil {
+            return "异常"
+        }
+        if selectedPresetAccountSession != nil {
+            return "已登录"
+        }
+        return "未登录"
+    }
+
+    var selectedPresetAccountStatusDetail: String {
+        if let overview = selectedPresetAccountOverview {
+            if let balance = overview.user.balance {
+                return String(format: "$%.2f", balance)
+            }
+            return overview.user.email ?? overview.user.username ?? "站点账户"
+        }
+        if let portalURL = URL(string: selectedPresetAccountPortalURL)?.host {
+            return portalURL
+        }
+        return selectedPresetAccountPortalURL.isEmpty ? "未配置门户地址" : selectedPresetAccountPortalURL
+    }
+
+    var shouldShowOnboarding: Bool {
+        hasCompletedOnboarding == false
+    }
+
+    var onboardingProgressText: String {
+        "\(onboardingStep.rawValue + 1) / \(OnboardingStep.allCases.count)"
+    }
+
+    var onboardingCanMoveForwardFromCurrentStep: Bool {
+        switch onboardingStep {
+        case .welcome, .importLive, .targetApp, .portalAccount, .finish:
+            return true
+        case .files:
+            return hasReadableConfigFile || hasReadableAuthFile
+        }
+    }
+
+    var hasReadableConfigFile: Bool {
+        FileManager.default.fileExists(atPath: expandedPath(paths.configPath))
+    }
+
+    var hasReadableAuthFile: Bool {
+        FileManager.default.fileExists(atPath: expandedPath(paths.authPath))
+    }
+
+    var shouldSuggestPortalAccountOnboarding: Bool {
+        let explicitPortalURL = draft.accountPortalURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if explicitPortalURL.isEmpty == false {
+            return true
+        }
+
+        guard draft.environmentTag != .official else {
+            return false
+        }
+
+        return resolvedPortalURL(for: draft).isEmpty == false
     }
 
     var hasUnsavedChanges: Bool {
@@ -348,6 +504,8 @@ final class AppModel: ObservableObject {
             self.recentPresetIDs = settings.recentPresetIDs
             self.presetEditorMode = settings.presetEditorMode
             self.operationHistory = Array(settings.operationHistory.prefix(maxOperationHistoryEntries))
+            self.hasCompletedOnboarding = settings.hasCompletedOnboarding
+            self.onboardingVersion = settings.onboardingVersion
             self.favoritePresetIDs.removeAll(where: { favoriteID in
                 !presets.contains(where: { $0.id == favoriteID })
             })
@@ -385,7 +543,23 @@ final class AppModel: ObservableObject {
             templates = []
             errorMessage = "模板加载失败：\(error.localizedDescription)"
         }
-    }
+
+        do {
+            presetAccountSessions = try accountSessionRepository.loadRecords()
+        } catch {
+            presetAccountSessions = []
+            errorMessage = "账号会话加载失败：\(error.localizedDescription)"
+        }
+
+            if let selectedPresetID,
+               presetAccountSessions.contains(where: { $0.presetID == selectedPresetID }) {
+                refreshSelectedPresetAccountOverview(silent: true)
+            }
+
+            if hasCompletedOnboarding == false {
+                onboardingStep = .welcome
+            }
+        }
 
     func selectPreset(id: UUID?) {
         guard let id else {
@@ -562,6 +736,7 @@ final class AppModel: ObservableObject {
         presets.append(duplicatedPreset)
         draft = duplicatedPreset
         selectedPresetID = duplicatedPreset.id
+        accountOverviewErrorMessage = nil
         recentStatusLine = nil
         statusMessage = "已复制当前预设。"
         persistAll()
@@ -695,6 +870,7 @@ final class AppModel: ObservableObject {
             return
         }
 
+        presetAccountSessions.removeAll(where: { $0.presetID == selectedPresetID })
         presets.remove(at: index)
         if storedLastAppliedPresetID == selectedPresetID {
             storedLastAppliedPresetID = nil
@@ -713,7 +889,9 @@ final class AppModel: ObservableObject {
             self.selectedPresetID = preset.id
         }
 
+        accountOverviewErrorMessage = nil
         statusMessage = "已删除预设。"
+        persistAccountSessions()
         persistAll()
     }
 
@@ -913,6 +1091,131 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func requestPortalLoginForDraft() {
+        guard let selectedPresetID else {
+            errorMessage = "请先保存为预设后，再绑定站点登录态。"
+            return
+        }
+
+        let portalURL = resolvedPortalURL(for: draft)
+        guard portalURL.isEmpty == false else {
+            errorMessage = "请先填写站点门户地址，或使用可自动推导门户的接口地址。"
+            return
+        }
+
+        portalLoginContext = PortalLoginContext(
+            presetID: selectedPresetID,
+            presetName: draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "当前预设" : draft.name,
+            portalURL: portalURL
+        )
+    }
+
+    func cancelPortalLogin() {
+        portalLoginContext = nil
+    }
+
+    func handlePortalLoginCapture(_ capture: PortalLoginCapture) {
+        guard let context = portalLoginContext else {
+            return
+        }
+
+        do {
+            let existingRecord = presetAccountSessions.first(where: { $0.presetID == context.presetID })
+            let record = try capture.makeSessionRecord(
+                id: existingRecord?.id ?? UUID(),
+                presetID: context.presetID,
+                cachedOverview: existingRecord?.cachedOverview,
+                updatedAt: Date()
+            )
+            upsertAccountSession(record)
+            portalLoginContext = nil
+            accountOverviewErrorMessage = nil
+            recentStatusLine = nil
+            statusMessage = "已接管站点登录态，正在刷新账户概览..."
+            refreshAccountOverview(for: context.presetID, silent: false)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func clearSelectedPresetAccountSession() {
+        guard let selectedPresetID else {
+            return
+        }
+
+        presetAccountSessions.removeAll(where: { $0.presetID == selectedPresetID })
+        accountOverviewErrorMessage = nil
+        recentStatusLine = nil
+        statusMessage = "已清除当前预设的站点登录态。"
+        persistAccountSessions()
+    }
+
+    func refreshSelectedPresetAccountOverview(silent: Bool = false) {
+        guard let selectedPresetID else {
+            errorMessage = "请先选择一个预设。"
+            return
+        }
+
+        refreshAccountOverview(for: selectedPresetID, silent: silent)
+    }
+
+    func reopenOnboarding(startingAt step: OnboardingStep = .welcome) {
+        onboardingStep = step
+        hasCompletedOnboarding = false
+        onboardingVersion = currentOnboardingVersion
+        isShowingSettingsSheet = false
+        recentStatusLine = nil
+        statusMessage = "已重新打开首次引导。"
+        persistSettings()
+    }
+
+    func goToNextOnboardingStep() {
+        guard let nextStep = OnboardingStep(rawValue: onboardingStep.rawValue + 1) else {
+            completeOnboarding()
+            return
+        }
+
+        onboardingStep = nextStep
+        recentStatusLine = nil
+        persistSettings()
+    }
+
+    func goToPreviousOnboardingStep() {
+        guard let previousStep = OnboardingStep(rawValue: onboardingStep.rawValue - 1) else {
+            return
+        }
+
+        onboardingStep = previousStep
+        recentStatusLine = nil
+    }
+
+    func completeOnboarding() {
+        hasCompletedOnboarding = true
+        onboardingVersion = currentOnboardingVersion
+        onboardingStep = .finish
+        recentStatusLine = nil
+        statusMessage = "首次设置已完成。"
+        persistSettings()
+    }
+
+    func createBlankPresetForOnboarding() {
+        addBlankPreset()
+        recentStatusLine = nil
+        statusMessage = "已创建空白预设，你可以继续补全基础配置。"
+    }
+
+    func refreshLiveConfigurationForOnboarding() {
+        reloadLiveConfiguration(bootstrapPresetIfNeeded: presets.isEmpty)
+        if let livePresetID {
+            selectedPresetID = livePresetID
+            if let livePreset = presets.first(where: { $0.id == livePresetID }) {
+                draft = livePreset
+            }
+        }
+        recentStatusLine = nil
+        statusMessage = "已重新读取当前配置。"
+    }
+
     func applyPresetFromMenu(id: UUID) {
         guard let preset = presets.first(where: { $0.id == id }) else {
             return
@@ -1098,7 +1401,9 @@ final class AppModel: ObservableObject {
                     favoritePresetIDs: favoritePresetIDs,
                     recentPresetIDs: recentPresetIDs,
                     presetEditorMode: presetEditorMode,
-                    operationHistory: operationHistory
+                    operationHistory: operationHistory,
+                    hasCompletedOnboarding: hasCompletedOnboarding,
+                    onboardingVersion: onboardingVersion
                 )
             )
         } catch {
@@ -1110,6 +1415,14 @@ final class AppModel: ObservableObject {
         persistSettings()
         do {
             try presetStore.savePresets(presets)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func persistAccountSessions() {
+        do {
+            try accountSessionRepository.saveRecords(presetAccountSessions)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1130,12 +1443,107 @@ final class AppModel: ObservableObject {
 
         selectedPresetID = id
         draft = preset
+        accountOverviewErrorMessage = nil
         clearPendingPresetSelection()
         persistSettings()
+
+        if presetAccountSessions.contains(where: { $0.presetID == id }) {
+            refreshSelectedPresetAccountOverview(silent: true)
+        }
     }
 
     private func clearPendingPresetSelection() {
         presetPendingSelection = nil
+    }
+
+    private func upsertAccountSession(_ record: PresetAccountSessionRecord) {
+        if let existingIndex = presetAccountSessions.firstIndex(where: { $0.id == record.id || $0.presetID == record.presetID }) {
+            presetAccountSessions[existingIndex] = record
+        } else {
+            presetAccountSessions.append(record)
+        }
+
+        persistAccountSessions()
+    }
+
+    private func refreshAccountOverview(for presetID: UUID, silent: Bool) {
+        let preset = accountRefreshPreset(for: presetID)
+        guard let preset else {
+            if silent == false {
+                errorMessage = "没有找到对应的预设，无法刷新账户概览。"
+            }
+            return
+        }
+
+        guard let record = presetAccountSessions.first(where: { $0.presetID == presetID }) else {
+            if silent == false {
+                errorMessage = "当前预设还没有站点登录态，请先登录。"
+            }
+            return
+        }
+
+        Task { @MainActor in
+            isRefreshingAccountOverview = true
+            if silent == false {
+                recentStatusLine = nil
+                statusMessage = "正在刷新站点账户概览..."
+            }
+
+            do {
+                let result = try await portalAccountService.refreshOverview(
+                    for: preset,
+                    record: record,
+                    range: defaultAccountOverviewRange()
+                )
+                upsertAccountSession(result.session)
+                accountOverviewErrorMessage = nil
+                if silent == false {
+                    statusMessage = "已刷新站点账户概览。"
+                }
+            } catch {
+                accountOverviewErrorMessage = error.localizedDescription
+                if silent == false {
+                    statusMessage = "站点账户概览刷新失败。"
+                }
+            }
+
+            isRefreshingAccountOverview = false
+        }
+    }
+
+    private func accountRefreshPreset(for presetID: UUID) -> CodexPreset? {
+        if selectedPresetID == presetID {
+            return draft
+        }
+
+        return presets.first(where: { $0.id == presetID })
+    }
+
+    private func resolvedPortalURL(for preset: CodexPreset) -> String {
+        let explicitPortalURL = preset.accountPortalURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if explicitPortalURL.isEmpty == false {
+            return explicitPortalURL
+        }
+
+        return (try? PortalURLHelper.inferredPortalURL(from: preset).absoluteString) ?? ""
+    }
+
+    private func expandedPath(_ path: String) -> String {
+        fileService.expandedPath(path)
+    }
+
+    private func defaultAccountOverviewRange() -> PortalAccountOverviewRange {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        let endDate = Date()
+        let startDate = Calendar(identifier: .gregorian).date(byAdding: .day, value: -6, to: endDate) ?? endDate
+        return PortalAccountOverviewRange(
+            startDate: formatter.string(from: startDate),
+            endDate: formatter.string(from: endDate)
+        )
     }
 
     private func nextPresetName() -> String {

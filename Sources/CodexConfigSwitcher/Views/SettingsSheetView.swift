@@ -119,6 +119,12 @@ struct SettingsSheetView: View {
                 }
 
                 HStack {
+                    Button("重新打开首次引导") {
+                        model.reopenOnboarding()
+                    }
+                    .buttonStyle(AppSecondaryButtonStyle())
+                    .appHoverLift()
+
                     Button("保存设置") {
                         model.persistSettings()
                     }

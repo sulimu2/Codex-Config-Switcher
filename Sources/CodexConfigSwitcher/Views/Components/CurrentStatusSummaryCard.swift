@@ -13,6 +13,8 @@ struct CurrentStatusSummaryCard: View {
     let lastAppliedText: String
     let targetAppName: String
     let targetAppStatusText: String
+    let accountStatusText: String
+    let accountStatusDetail: String
     let validationText: String?
 
     var body: some View {
@@ -72,6 +74,13 @@ struct CurrentStatusSummaryCard: View {
                     detail: targetAppName,
                     accent: targetAppTint
                 )
+
+                compactFact(
+                    title: "站点账户",
+                    value: accountStatusText,
+                    detail: accountStatusDetail,
+                    accent: accountTint
+                )
             }
 
             if let validationText, !validationText.isEmpty {
@@ -116,6 +125,19 @@ struct CurrentStatusSummaryCard: View {
 
     private var draftTint: Color {
         draftStatusText == "未保存修改" ? .orange : .green
+    }
+
+    private var accountTint: Color {
+        switch accountStatusText {
+        case "已同步":
+            AppTheme.positiveGreen
+        case "刷新中", "已登录":
+            AppTheme.brandBlue
+        case "异常":
+            .red
+        default:
+            AppTheme.cautionAmber
+        }
     }
 
     private func spotlightBlock(

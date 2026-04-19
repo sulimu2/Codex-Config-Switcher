@@ -83,6 +83,7 @@ public struct CodexPreset: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
     public var name: String
     public var environmentTag: PresetEnvironmentTag
+    public var accountPortalURL: String
     public var modelProvider: String
     public var model: String
     public var reviewModel: String
@@ -106,6 +107,7 @@ public struct CodexPreset: Identifiable, Codable, Equatable, Sendable {
         id: UUID = UUID(),
         name: String,
         environmentTag: PresetEnvironmentTag = .official,
+        accountPortalURL: String = "",
         modelProvider: String = "OpenAI",
         model: String = "gpt-5.4",
         reviewModel: String = "gpt-5.4",
@@ -128,6 +130,7 @@ public struct CodexPreset: Identifiable, Codable, Equatable, Sendable {
         self.id = id
         self.name = name
         self.environmentTag = environmentTag
+        self.accountPortalURL = accountPortalURL
         self.modelProvider = modelProvider
         self.model = model
         self.reviewModel = reviewModel
@@ -156,6 +159,7 @@ public struct CodexPreset: Identifiable, Codable, Equatable, Sendable {
         case id
         case name
         case environmentTag
+        case accountPortalURL
         case modelProvider
         case model
         case reviewModel
@@ -184,6 +188,7 @@ public struct CodexPreset: Identifiable, Codable, Equatable, Sendable {
         self.name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
         self.environmentTag = try container.decodeIfPresent(PresetEnvironmentTag.self, forKey: .environmentTag)
             ?? PresetEnvironmentTag.infer(from: decodedBaseURL)
+        self.accountPortalURL = try container.decodeIfPresent(String.self, forKey: .accountPortalURL) ?? ""
         self.modelProvider = try container.decodeIfPresent(String.self, forKey: .modelProvider) ?? "OpenAI"
         self.model = try container.decodeIfPresent(String.self, forKey: .model) ?? "gpt-5.4"
         self.reviewModel = try container.decodeIfPresent(String.self, forKey: .reviewModel) ?? "gpt-5.4"
@@ -295,6 +300,7 @@ public struct CodexTemplate: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
     public var name: String
     public var environmentTag: PresetEnvironmentTag
+    public var accountPortalURL: String
     public var modelProvider: String
     public var model: String
     public var reviewModel: String
@@ -317,6 +323,7 @@ public struct CodexTemplate: Identifiable, Codable, Equatable, Sendable {
         id: UUID = UUID(),
         name: String,
         environmentTag: PresetEnvironmentTag = .official,
+        accountPortalURL: String = "",
         modelProvider: String = "OpenAI",
         model: String = "gpt-5.4",
         reviewModel: String = "gpt-5.4",
@@ -338,6 +345,7 @@ public struct CodexTemplate: Identifiable, Codable, Equatable, Sendable {
         self.id = id
         self.name = name
         self.environmentTag = environmentTag
+        self.accountPortalURL = accountPortalURL
         self.modelProvider = modelProvider
         self.model = model
         self.reviewModel = reviewModel
@@ -362,6 +370,7 @@ public struct CodexTemplate: Identifiable, Codable, Equatable, Sendable {
             id: id,
             name: name ?? preset.name,
             environmentTag: preset.environmentTag,
+            accountPortalURL: preset.accountPortalURL,
             modelProvider: preset.modelProvider,
             model: preset.model,
             reviewModel: preset.reviewModel,
@@ -387,6 +396,7 @@ public struct CodexTemplate: Identifiable, Codable, Equatable, Sendable {
             id: id,
             name: name ?? self.name,
             environmentTag: environmentTag,
+            accountPortalURL: accountPortalURL,
             modelProvider: modelProvider,
             model: model,
             reviewModel: reviewModel,
@@ -539,6 +549,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var recentPresetIDs: [UUID]
     public var presetEditorMode: PresetEditorMode
     public var operationHistory: [PresetOperationHistoryEntry]
+    public var hasCompletedOnboarding: Bool
+    public var onboardingVersion: Int
 
     public init(
         paths: AppPaths = .default,
@@ -550,7 +562,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         favoritePresetIDs: [UUID] = [],
         recentPresetIDs: [UUID] = [],
         presetEditorMode: PresetEditorMode = .basic,
-        operationHistory: [PresetOperationHistoryEntry] = []
+        operationHistory: [PresetOperationHistoryEntry] = [],
+        hasCompletedOnboarding: Bool = true,
+        onboardingVersion: Int = 0
     ) {
         self.paths = paths
         self.selectedPresetID = selectedPresetID
@@ -562,6 +576,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.recentPresetIDs = recentPresetIDs
         self.presetEditorMode = presetEditorMode
         self.operationHistory = operationHistory
+        self.hasCompletedOnboarding = hasCompletedOnboarding
+        self.onboardingVersion = onboardingVersion
     }
 
     enum CodingKeys: String, CodingKey {
@@ -575,6 +591,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case recentPresetIDs
         case presetEditorMode
         case operationHistory
+        case hasCompletedOnboarding
+        case onboardingVersion
     }
 
     public init(from decoder: any Decoder) throws {
@@ -589,6 +607,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.recentPresetIDs = try container.decodeIfPresent([UUID].self, forKey: .recentPresetIDs) ?? []
         self.presetEditorMode = try container.decodeIfPresent(PresetEditorMode.self, forKey: .presetEditorMode) ?? .basic
         self.operationHistory = try container.decodeIfPresent([PresetOperationHistoryEntry].self, forKey: .operationHistory) ?? []
+        self.hasCompletedOnboarding = try container.decodeIfPresent(Bool.self, forKey: .hasCompletedOnboarding) ?? true
+        self.onboardingVersion = try container.decodeIfPresent(Int.self, forKey: .onboardingVersion) ?? 0
     }
 }
 

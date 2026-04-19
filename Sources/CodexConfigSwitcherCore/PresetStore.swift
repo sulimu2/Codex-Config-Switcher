@@ -37,7 +37,11 @@ public struct SettingsStore {
 
     public func loadSettings(defaultPaths: AppPaths = .default) throws -> AppSettings {
         guard fileManager.fileExists(atPath: fileURL.path) else {
-            return AppSettings(paths: defaultPaths)
+            return AppSettings(
+                paths: defaultPaths,
+                hasCompletedOnboarding: false,
+                onboardingVersion: 1
+            )
         }
 
         let data = try Data(contentsOf: fileURL)

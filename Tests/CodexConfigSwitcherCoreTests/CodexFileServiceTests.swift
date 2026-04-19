@@ -566,6 +566,17 @@ struct CodexFileServiceTests {
     }
 
     @Test
+    func settingsStoreMarksFreshWorkspaceAsNotOnboarded() throws {
+        let workspace = try TemporaryWorkspace()
+        let store = try SettingsStore(fileURL: workspace.rootDirectory.appendingPathComponent("settings.json"))
+
+        let settings = try store.loadSettings(defaultPaths: workspace.paths)
+
+        #expect(settings.hasCompletedOnboarding == false)
+        #expect(settings.onboardingVersion == 1)
+    }
+
+    @Test
     func settingsStorePersistsOperationHistory() throws {
         let workspace = try TemporaryWorkspace()
         let store = try SettingsStore(fileURL: workspace.rootDirectory.appendingPathComponent("settings.json"))
@@ -649,6 +660,8 @@ struct CodexFileServiceTests {
         #expect(settings.recentPresetIDs.isEmpty)
         #expect(settings.presetEditorMode == .basic)
         #expect(settings.operationHistory.isEmpty)
+        #expect(settings.hasCompletedOnboarding == true)
+        #expect(settings.onboardingVersion == 0)
     }
 }
 

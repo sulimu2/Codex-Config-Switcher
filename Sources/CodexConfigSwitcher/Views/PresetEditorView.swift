@@ -5,36 +5,69 @@ struct PresetEditorView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.colorScheme) private var colorScheme
     @State private var showPlaintextKey = false
+    let usesInternalScrollView: Bool
+
+    init(usesInternalScrollView: Bool = true) {
+        self.usesInternalScrollView = usesInternalScrollView
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                header
-                if model.hasUnsavedChanges {
-                    infoBanner(
-                        title: "未保存修改",
-                        message: "当前草稿和所选预设不同，可以覆盖保存，也可以另存为新预设。",
-                        tint: .orange
-                    )
+        Group {
+            if usesInternalScrollView {
+                ScrollView {
+                    editorContent
                 }
-                if let validationSummary = model.validationSummary {
-                    infoBanner(
-                        title: "应用前请先修正这些问题",
-                        message: validationSummary,
-                        tint: .orange
-                    )
-                }
-                basicSection
-                authSection
-                connectionTestSection
-                diffSection
-                advancedSection
-                statusSection
+            } else {
+                editorContent
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .groupBoxStyle(AppPanelGroupBoxStyle())
         }
         .background(Color(nsColor: .windowBackgroundColor))
+        .sheet(
+            item: $model.portalLoginContext,
+            onDismiss: {
+                model.cancelPortalLogin()
+            }
+        ) { context in
+            PortalLoginSheetView(
+                portalURL: context.portalURL,
+                presetName: context.presetName,
+                onComplete: { capture in
+                    model.handlePortalLoginCapture(capture)
+                },
+                onCancel: {
+                    model.cancelPortalLogin()
+                }
+            )
+        }
+    }
+
+    private var editorContent: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            header
+            if model.hasUnsavedChanges {
+                infoBanner(
+                    title: "未保存修改",
+                    message: "当前草稿和所选预设不同，可以覆盖保存，也可以另存为新预设。",
+                    tint: .orange
+                )
+            }
+            if let validationSummary = model.validationSummary {
+                infoBanner(
+                    title: "应用前请先修正这些问题",
+                    message: validationSummary,
+                    tint: .orange
+                )
+            }
+            basicSection
+            authSection
+            accountSection
+            connectionTestSection
+            diffSection
+            advancedSection
+            statusSection
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .groupBoxStyle(AppPanelGroupBoxStyle())
     }
 
     private var header: some View {
@@ -199,6 +232,17 @@ struct PresetEditorView: View {
                         .textFieldStyle(.roundedBorder)
                 }
 
+                LabeledFieldHelp(title: "站点门户", key: "account_portal_url", showsKey: model.isAdvancedEditorMode) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        TextField("https://xiaojie6.top", text: $model.draft.accountPortalURL)
+                            .textFieldStyle(.roundedBorder)
+
+                        Text("用于站点登录和拉取余额、token 使用与模型概览；如果留空，应用会尽量从接口地址自动推断。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 12) {
                     GridRow {
                         LabeledFieldHelp(title: "主模型", key: "model", showsKey: model.isAdvancedEditorMode) {
@@ -254,6 +298,25 @@ struct PresetEditorView: View {
             }
             .padding(.top, 6)
         }
+    }
+
+    private var accountSection: some View {
+        AccountInsightsPanel(
+            portalURL: model.selectedPresetAccountPortalURL,
+            session: model.selectedPresetAccountSession,
+            overview: model.selectedPresetAccountOverview,
+            isLoading: model.isRefreshingAccountOverview,
+            errorMessage: model.accountOverviewErrorMessage,
+            onLogin: {
+                model.requestPortalLoginForDraft()
+            },
+            onRefresh: {
+                model.refreshSelectedPresetAccountOverview()
+            },
+            onClearSession: {
+                model.clearSelectedPresetAccountSession()
+            }
+        )
     }
 
     private var advancedSection: some View {

@@ -256,22 +256,27 @@ struct MainWindowView: View {
     }
 
     private var detailView: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            heroSection
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 16, pinnedViews: [.sectionHeaders]) {
+                heroSection
 
-            workspaceHeader
-
-            Group {
-                switch workspaceMode {
-                case .presetEditor:
-                    PresetEditorView()
-                        .environmentObject(model)
-                case .templateWorkbench:
-                    templateWorkspace
+                Section {
+                    Group {
+                        switch workspaceMode {
+                        case .presetEditor:
+                            PresetEditorView(usesInternalScrollView: false)
+                                .environmentObject(model)
+                        case .templateWorkbench:
+                            templateWorkspace
+                        }
+                    }
+                } header: {
+                    stickyWorkspaceHeader
                 }
             }
+            .padding(20)
         }
-        .padding(20)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var pendingDeletionBinding: Binding<Bool> {
@@ -429,6 +434,8 @@ struct MainWindowView: View {
                     lastAppliedText: formattedLastApplied,
                     targetAppName: model.targetApp.displayName,
                     targetAppStatusText: model.targetAppStatusText,
+                    accountStatusText: model.selectedPresetAccountStatusTitle,
+                    accountStatusDetail: model.selectedPresetAccountStatusDetail,
                     validationText: model.validationSummary
                 )
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -499,6 +506,13 @@ struct MainWindowView: View {
             RoundedRectangle(cornerRadius: AppTheme.panelRadius)
                 .stroke(AppTheme.border(for: colorScheme), lineWidth: 1)
         )
+    }
+
+    private var stickyWorkspaceHeader: some View {
+        workspaceHeader
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 4)
+            .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var sidebarActionDock: some View {
@@ -594,20 +608,18 @@ struct MainWindowView: View {
     }
 
     private var templateWorkspace: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("模板工作台")
-                        .font(.title3.weight(.semibold))
-                    Text("模板相关操作已经从默认编辑流中抽离出来，这样高频编辑和低频模板管理不会再挤在同一屏。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                TemplateWorkbenchPanel()
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("模板工作台")
+                    .font(.title3.weight(.semibold))
+                Text("模板相关操作已经从默认编辑流中抽离出来，这样高频编辑和低频模板管理不会再挤在同一屏。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+
+            TemplateWorkbenchPanel()
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 

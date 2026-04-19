@@ -353,6 +353,72 @@ struct MenuBarContentView: View {
     }
 }
 
+struct OnboardingMenuBarContentView: View {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var isShowingInstallHelp = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("欢迎使用")
+                        .font(.headline)
+                    Text("先完成首次设置，再进入完整工作台。")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("当前步骤")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text("\(model.onboardingStep.title) · \(model.onboardingProgressText)")
+                        .font(.body.weight(.medium))
+                    Text(model.onboardingStep.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: AppTheme.panelRadius)
+                        .fill(AppTheme.heroFill(for: colorScheme))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: AppTheme.panelRadius)
+                        .stroke(AppTheme.border(for: colorScheme, emphasized: true), lineWidth: 1)
+                )
+
+                Button("打开首次设置") {
+                    model.reopenOnboarding(startingAt: model.onboardingStep)
+                    openWindow(id: "main")
+                }
+                .buttonStyle(.borderedProminent)
+                .appHoverLift()
+
+                Button("查看安装受阻说明") {
+                    isShowingInstallHelp = true
+                }
+                .buttonStyle(AppSecondaryButtonStyle())
+                .appHoverLift()
+
+                Divider()
+
+                Text("在首次设置完成前，菜单栏只保留最小入口，避免你误操作 live 配置。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(16)
+            .frame(width: 336, alignment: .leading)
+        }
+        .sheet(isPresented: $isShowingInstallHelp) {
+            InstallationHelpSheet()
+        }
+    }
+}
+
 private struct MenuPresetSection: Identifiable {
     let title: String
     let presets: [CodexPreset]

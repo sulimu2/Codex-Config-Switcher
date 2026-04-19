@@ -3,6 +3,7 @@ import Foundation
 public enum PresetValidationIssue: Equatable, Sendable {
     case emptyName
     case invalidBaseURL
+    case invalidAccountPortalURL
     case emptyModel
     case emptyReviewModel
     case emptyAuthMode
@@ -16,6 +17,8 @@ public enum PresetValidationIssue: Equatable, Sendable {
             "预设名称不能为空。"
         case .invalidBaseURL:
             "接口地址必须是合法的 http 或 https URL。"
+        case .invalidAccountPortalURL:
+            "站点门户地址必须是合法的 http 或 https URL。"
         case .emptyModel:
             "主模型不能为空。"
         case .emptyReviewModel:
@@ -63,6 +66,11 @@ public enum PresetValidator {
         let trimmedBaseURL = preset.baseURL.trimmedForValidation
         if !isValidBaseURL(trimmedBaseURL) {
             issues.append(.invalidBaseURL)
+        }
+
+        let trimmedAccountPortalURL = preset.accountPortalURL.trimmedForValidation
+        if !trimmedAccountPortalURL.isEmpty, !isValidBaseURL(trimmedAccountPortalURL) {
+            issues.append(.invalidAccountPortalURL)
         }
 
         if preset.model.trimmedForValidation.isEmpty {

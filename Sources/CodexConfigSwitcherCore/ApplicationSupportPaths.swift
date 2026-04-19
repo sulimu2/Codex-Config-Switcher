@@ -24,6 +24,10 @@ public enum ApplicationSupportPaths {
         try rootDirectory(fileManager: fileManager).appendingPathComponent("templates.json")
     }
 
+    public static func presetAccountSessionsFileURL(fileManager: FileManager = .default) throws -> URL {
+        try rootDirectory(fileManager: fileManager).appendingPathComponent("preset-account-sessions.json")
+    }
+
     public static func backupsDirectory(fileManager: FileManager = .default) throws -> URL {
         let directory = try rootDirectory(fileManager: fileManager).appendingPathComponent("Backups", isDirectory: true)
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)

@@ -577,6 +577,46 @@ struct AppModelTemplateWorkflowTests {
         #expect(model.lastConnectionTestResult?.title == "鉴权失败")
         #expect(model.statusMessage == "鉴权失败")
     }
+
+    @Test
+    func freshWorkspaceStartsOnboardingAndCanCompleteIt() throws {
+        let workspace = try AppModelWorkspace()
+        try workspace.writeConfig("model = \"gpt-5.4\"\n")
+        try workspace.writeAuth("{\"auth_mode\":\"apikey\",\"OPENAI_API_KEY\":\"live-key\"}")
+
+        let model = try workspace.makeAppModel()
+
+        #expect(model.shouldShowOnboarding)
+        #expect(model.onboardingStep == .welcome)
+
+        model.completeOnboarding()
+
+        #expect(model.shouldShowOnboarding == false)
+        #expect(model.onboardingVersion == 1)
+    }
+
+    @Test
+    func reopenOnboardingRestoresRequestedStep() throws {
+        let workspace = try AppModelWorkspace()
+        try workspace.writeConfig("model = \"gpt-5.4\"\n")
+        try workspace.writeAuth("{\"auth_mode\":\"apikey\",\"OPENAI_API_KEY\":\"live-key\"}")
+        let settingsStore = try SettingsStore(fileURL: workspace.settingsURL)
+        try settingsStore.saveSettings(
+            AppSettings(
+                paths: workspace.paths,
+                hasCompletedOnboarding: true,
+                onboardingVersion: 1
+            )
+        )
+
+        let model = try workspace.makeAppModel()
+        #expect(model.shouldShowOnboarding == false)
+
+        model.reopenOnboarding(startingAt: .targetApp)
+
+        #expect(model.shouldShowOnboarding)
+        #expect(model.onboardingStep == .targetApp)
+    }
 }
 
 private struct AppModelWorkspace {
@@ -587,6 +627,7 @@ private struct AppModelWorkspace {
     let presetsURL: URL
     let settingsURL: URL
     let templatesURL: URL
+    let portalAccountSessionsURL: URL
 
     var paths: AppPaths {
         AppPaths(configPath: configURL.path, authPath: authURL.path)
@@ -601,6 +642,7 @@ private struct AppModelWorkspace {
         presetsURL = baseDirectory.appendingPathComponent("presets.json")
         settingsURL = baseDirectory.appendingPathComponent("settings.json")
         templatesURL = baseDirectory.appendingPathComponent("templates.json")
+        portalAccountSessionsURL = baseDirectory.appendingPathComponent("preset-account-sessions.json")
 
         try FileManager.default.createDirectory(at: baseDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: appSupportDirectory, withIntermediateDirectories: true)
@@ -623,6 +665,7 @@ private struct AppModelWorkspace {
             presetStore: PresetStore(fileURL: presetsURL),
             settingsStore: SettingsStore(fileURL: settingsURL),
             templateStore: TemplateStore(fileURL: templatesURL),
+            accountSessionRepository: PresetAccountSessionRepository(fileURL: portalAccountSessionsURL),
             connectionTestService: connectionTestService
         )
     }

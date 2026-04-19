@@ -33,6 +33,11 @@
 - 主窗口侧边栏支持搜索预设、按收藏/最近使用/全部预设分组浏览
 - 主窗口支持按环境标签筛选预设，并按最近使用优先或名称排序
 - 支持测试连接，轻量检查接口地址、鉴权和主模型可用性
+- 支持为每个预设绑定站点门户地址，并在应用内完成站点登录
+- 登录站点账户后，可查看该预设对应账户的余额、累计 token、请求量、模型使用分布和可用模型列表
+- 站点登录态与账号概览已改为独立存储，不会进入模板文件，也不会混入预设导出文件
+- 支持 macOS 首次打开引导：逐步确认目标文件、当前 live 配置、目标 App 和可选站点账户登录
+- 首次分发打开如果遇到系统拦截，应用内和文档里都会提供“未 notarize / unknown developer”和“已损坏”两类情况的区别说明
 - 支持查看最近操作历史，记录预设应用与备份恢复的成功/失败结果
 - 支持应用内快捷键：`⌘⇧O` 打开主窗口，`⌘↩` 应用当前草稿/预设，`⌘R` 重新读取当前配置
 - 支持本地模板库：可从当前草稿保存为模板，并从模板快速创建新预设
@@ -126,6 +131,7 @@ cd <repo-path>
 
 - `~/Library/Application Support/CodexConfigSwitcher/presets.json`
 - `~/Library/Application Support/CodexConfigSwitcher/templates.json`
+- `~/Library/Application Support/CodexConfigSwitcher/preset-account-sessions.json`
 - `~/Library/Application Support/CodexConfigSwitcher/settings.json`
 - `~/Library/Application Support/CodexConfigSwitcher/Backups/`
 - Windows 默认目录会切换为 `%APPDATA%\\CodexConfigSwitcher\\`

@@ -13,6 +13,9 @@ public sealed class CodexPresetRecord
     [JsonPropertyName("environmentTag")]
     public string EnvironmentTag { get; set; } = "official";
 
+    [JsonPropertyName("accountPortalURL")]
+    public string AccountPortalUrl { get; set; } = string.Empty;
+
     [JsonPropertyName("providerName")]
     public string ProviderName { get; set; } = "OpenAI";
 
